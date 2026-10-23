@@ -3,7 +3,9 @@ package dev.hermeskotlin.core.network
 import dev.hermeskotlin.core.auth.NativeTokens
 import dev.hermeskotlin.core.auth.nativeBearer
 import dev.hermeskotlin.core.gateway.AccessTokens
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.gateway.cloudflareAccess
+import dev.hermeskotlin.core.gateway.proxyBasicAuth
 import io.ktor.client.HttpClient
 import io.ktor.client.HttpClientConfig
 import io.ktor.client.engine.HttpClientEngine
@@ -25,13 +27,15 @@ val HermesJson: Json = Json {
  * Shared Ktor client. [engine] is injectable for tests; otherwise the platform engine (OkHttp on Android)
  * is used. With [cookies], the dashboard session cookies are sent on every HTTP call and WS upgrade; with
  * [access], so are the Cloudflare Access service tokens, each to its own host; with [bearer], the browser
- * sign-in's access tokens, each to its own gateway.
+ * sign-in's access tokens, each to its own gateway; with [proxy], the logins for proxies that ask for HTTP
+ * basic auth, each to its own host.
  */
 fun createHttpClient(
     engine: HttpClientEngine? = null,
     cookies: CookiesStorage? = null,
     access: AccessTokens? = null,
     bearer: NativeTokens? = null,
+    proxy: ProxyLogins? = null,
 ): HttpClient {
     val config: HttpClientConfig<*>.() -> Unit = {
         expectSuccess = false
@@ -45,6 +49,7 @@ fun createHttpClient(
         install(WebSockets)
         if (cookies != null) install(HttpCookies) { storage = cookies }
         if (access != null) install(cloudflareAccess(access))
+        if (proxy != null) install(proxyBasicAuth(proxy))
         if (bearer != null) install(nativeBearer(bearer))
     }
     return if (engine != null) HttpClient(engine, config) else HttpClient(config)

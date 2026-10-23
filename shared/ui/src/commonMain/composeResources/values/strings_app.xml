@@ -362,6 +362,11 @@
     <string name="check_fix_dashboard_port">Use the dashboard’s own port, 9119 by default. Behind a proxy, check that it forwards to the dashboard.</string>
     <string name="check_fix_check_access_token">Check the Client ID and Client Secret, and that the Access application has a Service Auth policy that includes this token.</string>
     <string name="check_fix_add_access_token">Add a Cloudflare Access service token for this gateway, and give the Access application a Service Auth policy that includes it.</string>
+    <string name="check_proxy_login_required">A proxy in front of Hermes asks for a username and password (HTTP 401).</string>
+    <string name="check_proxy_login_refused">The proxy in front of Hermes turned down the username and password (HTTP 401).</string>
+    <string name="check_fix_check_proxy_login">Check the proxy username and password saved for this gateway.</string>
+    <string name="check_fix_add_proxy_login">Add the proxy's username and password for this gateway.</string>
+    <string name="check_fix_proxy_https">Use the gateway's https:// address: the app sends a proxy password over https only.</string>
     <string name="check_fix_loopback">This address points at this phone, not the server. Use the server’s local network or Tailscale address instead.</string>
     <string name="check_fix_tailscale">Turn on Tailscale on this phone, and check that the server is online in the same tailnet.</string>
     <string name="check_fix_https">Check that the domain points to the server, its certificate is valid, and the proxy forwards to the dashboard.</string>

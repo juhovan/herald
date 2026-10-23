@@ -4,6 +4,8 @@ import dev.hermeskotlin.core.gateway.AccessTokens
 import dev.hermeskotlin.core.gateway.CF_ACCESS_CLIENT_ID
 import dev.hermeskotlin.core.gateway.CF_ACCESS_CLIENT_SECRET
 import dev.hermeskotlin.core.gateway.GatewayUrl
+import dev.hermeskotlin.core.gateway.ProxyLogin
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import io.ktor.http.Url
 import io.ktor.http.isSecure
 import io.ktor.util.date.getTimeMillis
@@ -18,6 +20,8 @@ data class WebSession(
     val headers: Map<String, String>,
     /** When the lent access token lapses, in epoch ms; the app renews and lends a fresh one then. Null when unknown. */
     val expiresAt: Long?,
+    /** The login for a proxy that asks for HTTP basic auth, over https only. */
+    val proxyLogin: ProxyLogin? = null,
 )
 
 /**
@@ -38,15 +42,19 @@ class WebCookieJar(
     private val access: AccessTokens,
     private val tokens: NativeTokens,
     private val auth: AuthApi,
+    private val proxyLogins: ProxyLogins,
     private val clock: () -> Long = { getTimeMillis() },
 ) {
 
     suspend fun sessionFor(url: String): WebSession {
         val parsed = runCatching { Url(url) }.getOrNull() ?: return WebSession(emptyList(), emptyMap(), null)
+        val proxyLogin = if (parsed.protocol.isSecure()) proxyLogins.get(parsed.host) else null
         val native = tokens.forRequest(parsed)
-        if (native != null) return WebSession(nativeCookies(parsed, native), accessHeaders(parsed), native.expiresAt.takeIf { it > 0 }?.times(1000))
+        if (native != null) {
+            return WebSession(nativeCookies(parsed, native), accessHeaders(parsed), native.expiresAt.takeIf { it > 0 }?.times(1000), proxyLogin)
+        }
         val cookies = storage.webCookies(url)
-        return WebSession(cookies.values, accessHeaders(parsed), cookies.accessExpiresAt)
+        return WebSession(cookies.values, accessHeaders(parsed), cookies.accessExpiresAt, proxyLogin)
     }
 
     /**

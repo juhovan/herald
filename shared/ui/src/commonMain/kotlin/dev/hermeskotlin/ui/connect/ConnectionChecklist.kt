@@ -234,6 +234,8 @@ internal fun checkNoteText(note: CheckNote): String {
         CheckNote.Kind.AccessTokenRefused -> Res.string.check_access_token_refused
         CheckNote.Kind.AccessBlocked -> Res.string.check_access_blocked
         CheckNote.Kind.Unreachable -> Res.string.check_unreachable
+        CheckNote.Kind.ProxyLoginRequired -> Res.string.check_proxy_login_required
+        CheckNote.Kind.ProxyLoginRefused -> Res.string.check_proxy_login_refused
         CheckNote.Kind.FixSignInAgain -> Res.string.check_fix_sign_in_again
         CheckNote.Kind.FixSignInPasswordOrBrowser -> Res.string.check_fix_sign_in_password_or_browser
         CheckNote.Kind.FixWaitAMinute -> Res.string.check_fix_wait_a_minute
@@ -254,6 +256,9 @@ internal fun checkNoteText(note: CheckNote): String {
         CheckNote.Kind.FixDashboardPort -> Res.string.check_fix_dashboard_port
         CheckNote.Kind.FixCheckAccessToken -> Res.string.check_fix_check_access_token
         CheckNote.Kind.FixAddAccessToken -> Res.string.check_fix_add_access_token
+        CheckNote.Kind.FixCheckProxyLogin -> Res.string.check_fix_check_proxy_login
+        CheckNote.Kind.FixAddProxyLogin -> Res.string.check_fix_add_proxy_login
+        CheckNote.Kind.FixProxyHttps -> Res.string.check_fix_proxy_https
         CheckNote.Kind.FixLoopback -> Res.string.check_fix_loopback
         CheckNote.Kind.FixTailscale -> Res.string.check_fix_tailscale
         CheckNote.Kind.FixHttps -> Res.string.check_fix_https
