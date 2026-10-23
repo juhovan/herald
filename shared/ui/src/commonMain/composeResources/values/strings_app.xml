@@ -267,6 +267,14 @@
     <string name="connect_cert_hint">If a proxy in front of this address asks for a client certificate, pick it here so the test, the sign-in and the chat all present it.</string>
     <string name="connect_cert_kept">The key itself stays in the system store; only its name is kept, per gateway.</string>
     <string name="connect_pick_cert">Pick certificate</string>
+    <string name="connect_behind_proxy">Behind a proxy that asks for a password?</string>
+    <string name="connect_proxy_hint">If a reverse proxy in front of Hermes (nginx, Caddy, Traefik…) asks for a username and password before the dashboard, enter that login here. It isn't the dashboard's own sign-in.</string>
+    <string name="connect_proxy_saved">A proxy login is saved for this address</string>
+    <string name="connect_proxy_kept_hint">Leave the fields blank to keep using it, or enter a new login to replace it.</string>
+    <string name="connect_proxy_username">Proxy username</string>
+    <string name="connect_proxy_password">Proxy password</string>
+    <string name="connect_proxy_password_supporting">Stored encrypted on this phone, and sent only to this address over https://.</string>
+    <string name="connect_proxy_password_supporting_desktop">Stored encrypted on this computer, and sent only to this address over https://.</string>
     <string name="connect_reachable">Hermes is reachable</string>
     <string name="connect_reachable_version">Hermes %1$s is reachable</string>
     <string name="connect_tested_next">Sign-in is tested next, then the chat</string>

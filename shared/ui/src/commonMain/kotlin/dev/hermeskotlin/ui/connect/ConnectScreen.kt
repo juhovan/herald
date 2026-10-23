@@ -58,6 +58,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleHelp
 import com.composables.icons.lucide.Globe
 import com.composables.icons.lucide.KeyRound
+import com.composables.icons.lucide.Lock
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.PlugZap
 import com.composables.icons.lucide.ShieldCheck
@@ -114,6 +115,7 @@ fun ConnectScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val accessSaved by viewModel.accessSaved.collectAsStateWithLifecycle()
     val certAlias by viewModel.certAlias.collectAsStateWithLifecycle()
+    val proxySaved by viewModel.proxySaved.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
         snapshotFlow { viewModel.url.text.toString() }.drop(1).collect { viewModel.onUrlEdited() }
@@ -127,6 +129,9 @@ fun ConnectScreen(
         },
         cert = remember(viewModel, certAlias) {
             ClientCert(certAlias, viewModel::pickClientCert, viewModel::clearClientCert)
+        },
+        proxy = remember(viewModel, proxySaved) {
+            ProxyLogin(viewModel.proxyUsername, viewModel.proxyPassword, proxySaved, viewModel::forgetProxyLogin)
         },
         onTest = viewModel::testConnection,
         onContinue = { onContinue(SavedGateway(it.url.value, provider = PASSWORD_PROVIDER, clientCertAlias = certAlias)) },
@@ -149,9 +154,18 @@ internal class ClientCert(
     val onClear: () -> Unit,
 )
 
+/** The fields for a proxy's basic-auth login, and whether one is saved for this address already. */
+internal class ProxyLogin(
+    val username: TextFieldState,
+    val password: TextFieldState,
+    val saved: Boolean,
+    val onForget: () -> Unit,
+)
+
 /**
- * The address, tested from inside its field; what the test found; help on which address to use and on
- * Cloudflare Access; and, once the gateway answers with a sign-in the app can use, the way on to it.
+ * The address, tested from inside its field; what the test found; help on which address to use, on
+ * Cloudflare Access and on a proxy with a password; and, once the gateway answers with a sign-in the app
+ * can use, the way on to it.
  */
 @Composable
 internal fun ConnectView(
@@ -159,6 +173,7 @@ internal fun ConnectView(
     state: ConnectUiState,
     access: AccessToken,
     cert: ClientCert,
+    proxy: ProxyLogin,
     onTest: () -> Unit,
     onContinue: (ProbeResult.Reachable) -> Unit,
     onCancel: (() -> Unit)?,
@@ -251,6 +266,13 @@ internal fun ConnectView(
                 HelpRow(Lucide.ShieldCheck, stringResource(Res.string.connect_need_cert), certOpen) { certOpen = !certOpen }
                 if (certOpen) ClientCertFields(cert, demanded = result is ProbeResult.ClientCertRequired, onPick = picker::pick)
             }
+
+            var proxyOpen by rememberSaveable { mutableStateOf(false) }
+            LaunchedEffect(result, state.proxyError, proxy.saved) {
+                if (result is ProbeResult.ProxyLoginRequired || state.proxyError != null || proxy.saved) proxyOpen = true
+            }
+            HelpRow(Lucide.Lock, stringResource(Res.string.connect_behind_proxy), proxyOpen) { proxyOpen = !proxyOpen }
+            if (proxyOpen) ProxyLoginFields(proxy, state.proxyError, test)
         }
 
         if (signInReady) {
@@ -420,6 +442,40 @@ private fun ClientCertFields(cert: ClientCert, demanded: Boolean, onPick: () -> 
                 size = ButtonSize.Small,
             )
         }
+    }
+}
+
+/** The username and password for a proxy with HTTP basic auth, sent with every request to this gateway's address. */
+@Composable
+private fun ProxyLoginFields(proxy: ProxyLogin, error: String?, onTest: () -> Unit) {
+    Column(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Hint(stringResource(Res.string.connect_proxy_hint))
+        if (proxy.saved) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                StatusDot(Status.Ok, stringResource(Res.string.connect_proxy_saved))
+                Button(
+                    text = stringResource(Res.string.connect_forget),
+                    onClick = proxy.onForget,
+                    variant = ButtonVariant.Ghost,
+                    size = ButtonSize.Small,
+                )
+            }
+            Hint(stringResource(Res.string.connect_proxy_kept_hint))
+        }
+        TextField(
+            state = proxy.username,
+            label = stringResource(Res.string.connect_proxy_username),
+            error = error,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+        )
+        TextField(
+            state = proxy.password,
+            label = stringResource(Res.string.connect_proxy_password),
+            password = true,
+            supportingText = stringResource(if (isDesktop) Res.string.connect_proxy_password_supporting_desktop else Res.string.connect_proxy_password_supporting),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+            onKeyboardAction = { onTest() },
+        )
     }
 }
 
