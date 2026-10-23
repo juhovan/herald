@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.view.ViewGroup
 import android.webkit.CookieManager
+import android.webkit.HttpAuthHandler
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -45,6 +46,7 @@ import com.composeunstyled.Text
 import com.composeunstyled.theme.Theme
 import dev.hermeskotlin.core.auth.WebCookieJar
 import dev.hermeskotlin.core.auth.WebSession
+import dev.hermeskotlin.core.gateway.ProxyLogin
 import dev.hermeskotlin.designsystem.background
 import dev.hermeskotlin.designsystem.body
 import dev.hermeskotlin.designsystem.colors
@@ -85,6 +87,9 @@ actual fun PluginWebView(url: String, gateway: String, title: String, onClose: (
     var failed by remember { mutableStateOf(false) }
     // What the first load sent beyond cookies; a retry sends it again, as a plain reload wouldn't.
     var headers by remember { mutableStateOf(emptyMap<String, String>()) }
+    // What a proxy's basic-auth challenge is answered with, and the realms answered since the last lend.
+    var proxyLogin by remember { mutableStateOf<ProxyLogin?>(null) }
+    val answeredRealms = remember { mutableSetOf<String>() }
     val loginPath = remember(gateway) { (Uri.parse(gateway).path ?: "").trimEnd('/') + "/login" }
 
     /** Puts the app's current sign-in in the view's jar; [fresh] first drops whatever the jar held. */
@@ -93,6 +98,8 @@ actual fun PluginWebView(url: String, gateway: String, title: String, onClose: (
         // A page closed meanwhile has cleared the jar: lend nothing after that.
         currentCoroutineContext().ensureActive()
         headers = session.headers
+        proxyLogin = session.proxyLogin
+        answeredRealms.clear()
         CookieManager.getInstance().put(url, session.cookies, fresh)
         return session
     }
@@ -150,6 +157,16 @@ actual fun PluginWebView(url: String, gateway: String, title: String, onClose: (
 
                 override fun onPageFinished(view: WebView, finishedUrl: String?) {
                     loading = false
+                }
+
+                override fun onReceivedHttpAuthRequest(view: WebView, handler: HttpAuthHandler, host: String, realm: String?) {
+                    // Asked again for a realm already answered: the proxy turned the login down, so the page fails.
+                    val login = proxyLogin
+                    if (login != null && host.equals(Uri.parse(url).host, ignoreCase = true) && answeredRealms.add(realm.orEmpty())) {
+                        handler.proceed(login.username, login.password)
+                    } else {
+                        handler.cancel()
+                    }
                 }
 
                 override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
