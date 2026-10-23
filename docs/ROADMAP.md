@@ -76,6 +76,7 @@ uses. The protocol itself is described in [hermes-protocol-research.md](hermes-p
 - [x] Connection check by stage, each with its own fix: server access (`/api/status`), sign-in (`/api/auth/me`) and the live connection (WS ticket, `/api/ws`, `gateway.ready`). The connect screen tests the server and explains local network, Tailscale and HTTPS addresses; Settings → Check connection runs all three
 - [x] Warning when a gateway would be reached over plain `http://` on a public address
 - [x] Gateways behind Cloudflare Access: a per-address service token (`CF-Access-Client-Id` / `CF-Access-Client-Secret`, stored encrypted, sent over HTTPS only) on every call and the `/api/ws` upgrade; an Access login redirect or Cloudflare 403 is named as such in the connection check and errors
+- [x] Gateways behind a reverse proxy with HTTP basic auth: a per-address proxy login (stored encrypted, sent as `Authorization: Basic` over HTTPS only) on every call, the `/api/ws` upgrade and the plugin WebView; a 401 with a `Basic` challenge is named as the proxy's in the connection check and errors, and doesn't sign out. A browser sign-in's bearer token can't share the header, so use the password sign-in behind such a proxy
 - [x] Clear error messages for 401, 429, WS close 4401 (bad ticket) and 4403 (Host/peer guard). Note: the server rejects these before the upgrade, so they arrive as an HTTP 403 handshake failure
 - [x] Sign out (server-side revoke + local cookie wipe), and "use a different gateway"
 
