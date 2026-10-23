@@ -56,6 +56,8 @@ data class CheckNote(val kind: Kind, val args: List<String> = emptyList()) {
         AccessTokenRefused,
         AccessBlocked,
         Unreachable,
+        ProxyLoginRequired,
+        ProxyLoginRefused,
 
         // Fixes.
         FixSignInAgain,
@@ -74,6 +76,9 @@ data class CheckNote(val kind: Kind, val args: List<String> = emptyList()) {
         FixDashboardPort,
         FixCheckAccessToken,
         FixAddAccessToken,
+        FixCheckProxyLogin,
+        FixAddProxyLogin,
+        FixProxyHttps,
         FixLoopback,
         FixTailscale,
         FixHttps,
@@ -213,6 +218,11 @@ fun ProbeResult.toStageResult(): StageResult = when (this) {
         StageResult.Failed(note(CheckNote.Kind.AccessTokenRefused, httpStatus.toString()), note(CheckNote.Kind.FixCheckAccessToken))
     } else {
         StageResult.Failed(note(CheckNote.Kind.AccessBlocked, httpStatus.toString()), note(CheckNote.Kind.FixAddAccessToken))
+    }
+    is ProbeResult.ProxyLoginRequired -> when {
+        loginSent -> StageResult.Failed(note(CheckNote.Kind.ProxyLoginRefused), note(CheckNote.Kind.FixCheckProxyLogin))
+        Url(url.value).protocol != URLProtocol.HTTPS -> StageResult.Failed(note(CheckNote.Kind.ProxyLoginRequired), note(CheckNote.Kind.FixProxyHttps))
+        else -> StageResult.Failed(note(CheckNote.Kind.ProxyLoginRequired), note(CheckNote.Kind.FixAddProxyLogin))
     }
     is ProbeResult.Unreachable -> StageResult.Failed(note(CheckNote.Kind.Unreachable, url.toString(), reason), reachFix(url))
 }

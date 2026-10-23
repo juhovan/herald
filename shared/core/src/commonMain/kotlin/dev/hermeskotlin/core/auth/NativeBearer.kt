@@ -29,7 +29,8 @@ private data class NativeRefreshBody(@SerialName("refresh_token") val refreshTok
 /**
  * Sends the browser sign-in's access token as `Authorization: Bearer` on the `/api/` calls to its gateway. The
  * gateway doesn't refresh a bearer session itself, so this does when a call comes back 401, then retries it once.
- * The `/auth/` routes are public and get no token, and the `/api/ws` upgrade carries a ticket instead.
+ * The `/auth/` routes are public and get no token, and the `/api/ws` upgrade carries a ticket instead. A call that
+ * already carries an `Authorization` (a proxy's basic-auth login) keeps it: without it the proxy lets nothing through.
  *
  * A refresh the gateway turns down (`session_expired`) forgets the tokens, and the call's 401 then signs the user
  * out as usual. A refresh it can't do (its identity provider is down, 503) keeps them, and the call fails as
@@ -39,7 +40,9 @@ fun nativeBearer(tokens: NativeTokens, clock: () -> Long = { getTimeMillis() }) 
     val refresher = NativeRefresher(client, tokens, clock)
     on(Send) { request ->
         val protocol = request.url.protocol
-        if (protocol != URLProtocol.HTTP && protocol != URLProtocol.HTTPS || API_PATH !in request.url.encodedPath) {
+        if (protocol != URLProtocol.HTTP && protocol != URLProtocol.HTTPS || API_PATH !in request.url.encodedPath ||
+            request.headers.contains(HttpHeaders.Authorization)
+        ) {
             return@on proceed(request)
         }
         val session = tokens.forRequest(request.url.build()) ?: return@on proceed(request)
