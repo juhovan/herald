@@ -21,6 +21,7 @@ import dev.hermeskotlin.core.gateway.AccessTokens
 import dev.hermeskotlin.core.gateway.ClientCertAliases
 import dev.hermeskotlin.core.gateway.GatewayList
 import dev.hermeskotlin.core.gateway.GatewayRepository
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.inbox.InboxStore
 import dev.hermeskotlin.ui.inbox.ReportChat
 import dev.hermeskotlin.core.gateway.SavedGateway
@@ -106,6 +107,7 @@ class AppViewModel(
     private val botChats: BotChats,
     private val push: PushSetup,
     private val access: AccessTokens,
+    private val proxyLogins: ProxyLogins,
     private val settings: SettingsStore,
     private val sessions: SessionsApi,
     private val botsApi: BotsApi,
@@ -178,8 +180,8 @@ class AppViewModel(
 
     init {
         viewModelScope.launch {
-            // Before anything connects: drops tokens entered for an address that was tested but never signed in to.
-            forgetUnusedAccessTokens()
+            // Before anything connects: drops tokens and logins entered for an address that was tested but never signed in to.
+            forgetUnusedHostCredentials()
             val list = gateways.all()
             val saved = list.current ?: list.primary?.also { gateways.select(it.url) }
             _route.value = when {
@@ -360,7 +362,7 @@ class AppViewModel(
             // The saved alias goes with the gateway: no connection made with it is reused.
             if (gateway.clientCertAlias != null) certs.changed(gateway.gatewayUrl.host)
             inbox?.forget(gateway.gatewayUrl.value)
-            forgetUnusedAccessTokens()
+            forgetUnusedHostCredentials()
             sessionsChanged.update { it + 1 }
             if (wasCurrent) {
                 val next = gateways.all().primary
@@ -369,9 +371,14 @@ class AppViewModel(
         }
     }
 
-    /** An Access token belongs to a host: it stays while a saved gateway uses that host, and goes with the last one. */
-    private suspend fun forgetUnusedAccessTokens() {
-        access.retainOnly(gateways.all().gateways.map { it.gatewayUrl.host })
+    /**
+     * An Access token or proxy login belongs to a host: it stays while a saved gateway uses that host, and goes
+     * with the last one.
+     */
+    private suspend fun forgetUnusedHostCredentials() {
+        val hosts = gateways.all().gateways.map { it.gatewayUrl.host }
+        access.retainOnly(hosts)
+        proxyLogins.retainOnly(hosts)
     }
 
     /** Opens a stored chat; [readUpTo] is how far it had been read, when it has new messages since. */

@@ -25,6 +25,8 @@ import dev.hermeskotlin.core.gateway.AccessTokens
 import dev.hermeskotlin.core.gateway.ClientCertAliases
 import dev.hermeskotlin.core.gateway.clientCertAliasFor
 import dev.hermeskotlin.core.gateway.GatewayRepository
+import dev.hermeskotlin.core.gateway.ProxyLogin
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.gateway.SavedGateway
 import dev.hermeskotlin.core.network.createHttpClient
 import dev.hermeskotlin.core.profiles.ProfileStore
@@ -93,6 +95,7 @@ class AppViewModelTest {
     private val gateways = GatewayRepository(store)
     private val lastChats = LastChatStore(store)
     private val access = AccessTokens(store)
+    private val proxyLogins = ProxyLogins(store)
     private val cache = OfflineCache(InMemoryOfflineDao(), PlainSealer, EmptyCoroutineContext) { 0L }
 
     // The connection waits on its ticket for good (a retry loop would keep the test clock busy, so a missed
@@ -131,7 +134,7 @@ class AppViewModelTest {
         val host = ChatHost(connection, SessionsApi(client), backgroundScope)
         callSettings = callStore ?: SettingsStore(store, backgroundScope)
         val push = PushSetup(PushApi(connection), NoPushKeys, connection, gateways, SettingsStore(store, backgroundScope), backgroundScope) { "Test" }
-        return AppViewModel(gateways, auth, connection, lastChats, host, ProfileStore(store), links, BotChats(if (botTransport == null) NoBotChats else dev.hermeskotlin.core.bots.BotsApi(connection)), push, access, callSettings, SessionsApi(client), BotsApi(connection), cache, seen, certs = certs)
+        return AppViewModel(gateways, auth, connection, lastChats, host, ProfileStore(store), links, BotChats(if (botTransport == null) NoBotChats else dev.hermeskotlin.core.bots.BotsApi(connection)), push, access, proxyLogins, callSettings, SessionsApi(client), BotsApi(connection), cache, seen, certs = certs)
     }
 
     private val seen = SeenStore(store) { 1_000.0 }
@@ -624,6 +627,24 @@ class AppViewModelTest {
 
         assertEquals(token, access.get(work.gatewayUrl.host))
         assertNull(access.get("typo.example.com"))
+    }
+
+    @Test
+    fun proxyLoginsGoWithTheLastGatewayOnTheirHost() = runTest {
+        val login = ProxyLogin("juho", "secret")
+        gateways.save(work)
+        gateways.save(home)
+        signedIn(home)
+        proxyLogins.set(work.gatewayUrl.host, login)
+        proxyLogins.set("typo.example.com", login)
+        val vm = viewModel()
+        vm.awaitChat(home)
+        assertEquals(login, proxyLogins.get(work.gatewayUrl.host))
+        assertNull(proxyLogins.get("typo.example.com"), "launch forgets an address never signed in to")
+
+        vm.removeGateway(work)
+        gateways.list.first { it.gateways.size == 1 }
+        assertNull(proxyLogins.get(work.gatewayUrl.host))
     }
 
     @Test

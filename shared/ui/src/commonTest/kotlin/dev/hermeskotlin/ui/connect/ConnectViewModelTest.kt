@@ -9,6 +9,8 @@ import dev.hermeskotlin.core.gateway.ClientCertAliases
 import dev.hermeskotlin.core.gateway.GatewayProbe
 import dev.hermeskotlin.core.gateway.GatewayRepository
 import dev.hermeskotlin.core.gateway.ProbeResult
+import dev.hermeskotlin.core.gateway.ProxyLogin
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.gateway.SavedGateway
 import dev.hermeskotlin.core.gateway.clientCertAliasFor
 import dev.hermeskotlin.core.network.createHttpClient
@@ -46,6 +48,7 @@ class ConnectViewModelTest {
     @AfterTest fun tearDown() = Dispatchers.resetMain()
 
     private val access = AccessTokens(InMemoryKeyValueStore())
+    private val proxyLogins = ProxyLogins(InMemoryKeyValueStore())
     private val seen = mutableListOf<HttpRequestData>()
 
     private fun viewModel(
@@ -63,7 +66,7 @@ class ConnectViewModelTest {
                 headersOf(HttpHeaders.ContentType, "application/json"),
             )
         }
-        return ConnectViewModel(GatewayProbe(createHttpClient(MockEngine(config), access = access)), access, certs, gateways)
+        return ConnectViewModel(GatewayProbe(createHttpClient(MockEngine(config), access = access, proxy = proxyLogins)), access, proxyLogins, certs, gateways)
     }
 
     /** The mock engine completes on Ktor's own dispatcher, so wait for the state instead of the test scheduler. */
@@ -272,5 +275,51 @@ class ConnectViewModelTest {
 
         vm.clearClientCert()
         assertNull(vm.certAlias.value)
+    }
+
+    @Test
+    fun proxyLoginIsSavedForTheHostAndSentWithTheProbe() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.url.setTextAndPlaceCursorAtEnd("https://hermes.example.com")
+        vm.proxyUsername.setTextAndPlaceCursorAtEnd(" juho ")
+        vm.proxyPassword.setTextAndPlaceCursorAtEnd(" secret")
+        vm.testConnection()
+        awaitResult(vm)
+        val login = ProxyLogin("juho", " secret")
+        assertEquals(login, proxyLogins.get("hermes.example.com"), "the username is trimmed, the password kept as typed")
+        assertEquals(login.authorization, seen.single().headers[HttpHeaders.Authorization])
+        assertTrue(vm.proxySaved.value)
+        assertEquals("", vm.proxyPassword.text.toString(), "the password doesn't linger on screen")
+    }
+
+    @Test
+    fun aSavedProxyLoginShowsForItsAddressAndCanBeForgotten() = runTest(dispatcher) {
+        proxyLogins.set("hermes.example.com", ProxyLogin("juho", "secret"))
+        val vm = viewModel()
+
+        vm.url.setTextAndPlaceCursorAtEnd("https://hermes.example.com")
+        vm.onUrlEdited()
+        assertTrue(vm.proxySaved.value)
+
+        vm.forgetProxyLogin()
+        assertFalse(vm.proxySaved.value)
+        assertNull(proxyLogins.get("hermes.example.com"))
+    }
+
+    @Test
+    fun halfAProxyLoginOrAColonInTheUsernameIsAnErrorWithoutProbing() = runTest(dispatcher) {
+        val vm = viewModel()
+        vm.url.setTextAndPlaceCursorAtEnd("https://hermes.example.com")
+        vm.proxyUsername.setTextAndPlaceCursorAtEnd("juho")
+        vm.testConnection()
+        assertNotNull(vm.state.value.proxyError)
+
+        vm.proxyUsername.setTextAndPlaceCursorAtEnd("ju:ho")
+        vm.proxyPassword.setTextAndPlaceCursorAtEnd("secret")
+        vm.testConnection()
+        assertNotNull(vm.state.value.proxyError)
+
+        assertNull(proxyLogins.get("hermes.example.com"))
+        assertEquals(emptyList(), seen)
     }
 }

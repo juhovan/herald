@@ -12,6 +12,8 @@ import dev.hermeskotlin.core.gateway.GatewayRepository
 import dev.hermeskotlin.core.gateway.GatewayUrl
 import dev.hermeskotlin.core.gateway.InvalidGatewayUrlException
 import dev.hermeskotlin.core.gateway.ProbeResult
+import dev.hermeskotlin.core.gateway.ProxyLogin
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.gateway.clientCertAliasFor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +27,7 @@ data class ConnectUiState(
     /** Why the address isn't one; the screen words it. */
     val urlError: InvalidGatewayUrlException? = null,
     val accessError: AccessTokenProblem? = null,
+    val proxyError: String? = null,
     val result: ProbeResult? = null,
 )
 
@@ -37,6 +40,7 @@ enum class AccessTokenProblem {
 class ConnectViewModel(
     private val probe: GatewayProbe,
     private val access: AccessTokens,
+    private val proxyLogins: ProxyLogins,
     private val certs: ClientCertAliases,
     private val gateways: GatewayRepository,
 ) : ViewModel() {
@@ -46,6 +50,10 @@ class ConnectViewModel(
     /** A Cloudflare Access service token, for a gateway behind Access. Both blank: keep the one saved for the host. */
     val accessClientId = TextFieldState()
     val accessClientSecret = TextFieldState()
+
+    /** The login for a proxy that asks for HTTP basic auth. Both blank: keep the one saved for the host. */
+    val proxyUsername = TextFieldState()
+    val proxyPassword = TextFieldState()
 
     private val _state = MutableStateFlow(ConnectUiState())
     val state: StateFlow<ConnectUiState> = _state.asStateFlow()
@@ -60,8 +68,14 @@ class ConnectViewModel(
     /** The client certificate picked for the address typed, shown by its system-store alias. */
     val certAlias: StateFlow<String?> = _certAlias.asStateFlow()
 
+    private val _proxySaved = MutableStateFlow(false)
+
+    /** Whether a proxy login is saved for the address typed, so blank fields keep using it. */
+    val proxySaved: StateFlow<Boolean> = _proxySaved.asStateFlow()
+
     private var probeJob: Job? = null
     private var lookupJob: Job? = null
+    private var proxyLookupJob: Job? = null
 
     /** The last certificate pick being stored; the probe waits for it so it presents what was just picked. */
     private var certJob: Job? = null
@@ -102,6 +116,15 @@ class ConnectViewModel(
         }
     }
 
+    fun forgetProxyLogin() {
+        val host = GatewayUrl.parseOrNull(url.text.toString())?.host ?: return
+        proxyLookupJob?.cancel()
+        proxyLookupJob = viewModelScope.launch {
+            proxyLogins.set(host, null)
+            _proxySaved.value = false
+        }
+    }
+
     fun testConnection() {
         val gatewayUrl = try {
             GatewayUrl.parse(url.text.toString())
@@ -115,11 +138,22 @@ class ConnectViewModel(
             _state.value = ConnectUiState(accessError = AccessTokenProblem.HalfFilled)
             return
         }
+        // The password as typed: spaces may be part of it.
+        val proxyUser = proxyUsername.text.trim().toString()
+        val proxyPass = proxyPassword.text.toString()
+        if (proxyUser.isEmpty() != proxyPass.isEmpty()) {
+            _state.value = ConnectUiState(proxyError = "Enter both the username and the password, or neither.")
+            return
+        }
+        if (':' in proxyUser) {
+            _state.value = ConnectUiState(proxyError = "Basic auth can't send a username with a colon in it.")
+            return
+        }
 
         probeJob?.cancel()
         _state.value = ConnectUiState(testing = true)
         probeJob = viewModelScope.launch {
-            // Saved before the probe, so the probe, the sign-in and the chat all go through Access with it.
+            // Saved before the probe, so the probe, the sign-in and the chat all go through Access or the proxy with them.
             if (clientId.isNotEmpty()) {
                 lookupJob?.cancel()
                 access.set(gatewayUrl.host, AccessToken(clientId, clientSecret))
@@ -128,6 +162,13 @@ class ConnectViewModel(
                 accessClientSecret.clearText()
             }
             certJob?.join()
+            if (proxyUser.isNotEmpty()) {
+                proxyLookupJob?.cancel()
+                proxyLogins.set(gatewayUrl.host, ProxyLogin(proxyUser, proxyPass))
+                _proxySaved.value = true
+                proxyUsername.clearText()
+                proxyPassword.clearText()
+            }
             val result = probe.probe(gatewayUrl)
             _state.update { it.copy(testing = false, result = result) }
         }
@@ -135,7 +176,8 @@ class ConnectViewModel(
 
     /** Typing invalidates the previous result, and looks up what the new address already has picked or saved. */
     fun onUrlEdited() {
-        if (_state.value.result != null || _state.value.urlError != null || _state.value.accessError != null) {
+        val state = _state.value
+        if (state.result != null || state.urlError != null || state.accessError != null || state.proxyError != null) {
             probeJob?.cancel()
             _state.value = ConnectUiState()
         }
@@ -150,5 +192,7 @@ class ConnectViewModel(
             val alias = host?.let { clientCertAliasFor(it, certs, gateways.all().gateways) }
             if (certJob === pick) _certAlias.value = alias
         }
+        proxyLookupJob?.cancel()
+        proxyLookupJob = viewModelScope.launch { _proxySaved.value = host != null && proxyLogins.get(host) != null }
     }
 }

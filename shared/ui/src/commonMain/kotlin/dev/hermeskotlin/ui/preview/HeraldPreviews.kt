@@ -26,6 +26,7 @@ import dev.hermeskotlin.ui.connect.ClientCert
 import dev.hermeskotlin.ui.connect.ConnectUiState
 import dev.hermeskotlin.ui.connect.ConnectView
 import dev.hermeskotlin.ui.connect.ConnectionChecklist
+import dev.hermeskotlin.ui.connect.ProxyLogin
 import dev.hermeskotlin.ui.signin.SignInMethods
 import dev.hermeskotlin.ui.signin.SignInUiState
 import dev.hermeskotlin.ui.signin.SignInView
@@ -885,6 +886,7 @@ private fun SampleConnect(result: ProbeResult, address: String = "hermes.example
         state = ConnectUiState(result = result),
         access = AccessToken(remember { TextFieldState() }, remember { TextFieldState() }, saved = false, onForget = {}),
         cert = ClientCert(alias = null, onPick = {}, onClear = {}),
+        proxy = ProxyLogin(remember { TextFieldState() }, remember { TextFieldState() }, saved = false, onForget = {}),
         onTest = {},
         onContinue = {},
         onCancel = null,
