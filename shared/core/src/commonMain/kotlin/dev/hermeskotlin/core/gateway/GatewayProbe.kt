@@ -32,6 +32,12 @@ sealed interface ProbeResult {
      */
     data class AccessBlocked(val url: GatewayUrl, val httpStatus: Int, val tokenSent: Boolean) : ProbeResult
 
+    /**
+     * A proxy in front of Hermes asked for HTTP basic auth (a 401 with a `Basic` challenge). [loginSent] says
+     * whether a proxy login went with the request, so whether it was turned down.
+     */
+    data class ProxyLoginRequired(val url: GatewayUrl, val loginSent: Boolean) : ProbeResult
+
     /** Nothing answered (DNS, refused, timeout, TLS...). */
     data class Unreachable(val url: GatewayUrl, val reason: String) : ProbeResult
 
@@ -59,6 +65,8 @@ class GatewayProbe(private val client: HttpClient) {
             ProbeResult.AccessBlocked(url, code, tokenSent)
         } else if (!isJson && code in CERT_REPLY_CODES && isClientCertReply(code, response.bodyAsText().take(CERT_REPLY_SCAN))) {
             ProbeResult.ClientCertRequired(url, "HTTP $code")
+        } else if (isBasicAuthChallenge(code, response.headers.getAll(HttpHeaders.WWWAuthenticate))) {
+            ProbeResult.ProxyLoginRequired(url, loginSent = response.request.headers[HttpHeaders.Authorization] != null)
         } else if (!response.status.isSuccess() || !isJson) {
             ProbeResult.NotHermes(url, response.status.value)
         } else {

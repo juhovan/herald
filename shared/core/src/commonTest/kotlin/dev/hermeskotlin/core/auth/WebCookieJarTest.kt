@@ -5,6 +5,8 @@ import dev.hermeskotlin.core.gateway.AccessTokens
 import dev.hermeskotlin.core.gateway.CF_ACCESS_CLIENT_ID
 import dev.hermeskotlin.core.gateway.CF_ACCESS_CLIENT_SECRET
 import dev.hermeskotlin.core.gateway.GatewayUrl
+import dev.hermeskotlin.core.gateway.ProxyLogin
+import dev.hermeskotlin.core.gateway.ProxyLogins
 import dev.hermeskotlin.core.network.createHttpClient
 import dev.hermeskotlin.core.storage.InMemoryKeyValueStore
 import io.ktor.client.engine.mock.MockEngine
@@ -20,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class WebCookieJarTest {
@@ -31,10 +34,11 @@ class WebCookieJarTest {
     private val cookies = PersistentCookiesStorage(store) { now }
     private val access = AccessTokens(store)
     private val tokens = NativeTokens(store)
+    private val proxyLogins = ProxyLogins(store)
 
     private fun jar(handler: MockRequestHandler = { error("no calls") }): WebCookieJar {
         val client = createHttpClient(MockEngine(handler), cookies = cookies, access = access, bearer = tokens)
-        return WebCookieJar(cookies, access, tokens, AuthApi(client, cookies, tokens)) { now }
+        return WebCookieJar(cookies, access, tokens, AuthApi(client, cookies, tokens), proxyLogins) { now }
     }
 
     @Test
@@ -69,6 +73,16 @@ class WebCookieJarTest {
         assertEquals(mapOf(CF_ACCESS_CLIENT_ID to "id", CF_ACCESS_CLIENT_SECRET to "secret"), jar().sessionFor(page).headers)
         assertTrue(jar().sessionFor("http://hermes.example.ts.net/example-board").headers.isEmpty())
         assertTrue(jar().sessionFor("https://other.ts.net/example-board").headers.isEmpty())
+    }
+
+    @Test
+    fun theProxyLoginGoesOverHttpsOnly() = runTest {
+        val login = ProxyLogin("juho", "secret")
+        proxyLogins.set("hermes.example.ts.net", login)
+
+        assertEquals(login, jar().sessionFor(page).proxyLogin)
+        assertNull(jar().sessionFor("http://hermes.example.ts.net/example-board").proxyLogin)
+        assertNull(jar().sessionFor("https://other.ts.net/example-board").proxyLogin)
     }
 
     @Test

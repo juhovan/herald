@@ -1,6 +1,7 @@
 package dev.hermeskotlin.core.network
 
 import dev.hermeskotlin.core.gateway.isAccessLoginRedirect
+import dev.hermeskotlin.core.gateway.isBasicAuthChallenge
 import dev.hermeskotlin.core.gateway.isCloudflareRefusal
 import io.ktor.client.call.body
 import io.ktor.client.statement.HttpResponse
@@ -42,6 +43,9 @@ internal suspend fun apiCall(isLogin: Boolean = false, block: suspend () -> Http
         val status = response.status
         when {
             status.isSuccess() -> ApiResult.Success(response)
+            // Before the plain 401: the proxy stopped the call, so Hermes never saw the session to expire it.
+            isBasicAuthChallenge(status.value, response.headers.getAll(HttpHeaders.WWWAuthenticate)) ->
+                ApiResult.Failed(status.value, PROXY_LOGIN_NEEDED)
             status == HttpStatusCode.Unauthorized ->
                 if (isLogin) ApiResult.InvalidCredentials else ApiResult.SessionExpired
             status == HttpStatusCode.TooManyRequests -> ApiResult.RateLimited
@@ -60,6 +64,10 @@ internal suspend fun apiCall(isLogin: Boolean = false, block: suspend () -> Http
 /** What a request stopped by Cloudflare Access fails with, on any gateway call. */
 const val ACCESS_BLOCKED =
     "Cloudflare stopped the request before it reached Hermes. If Cloudflare Access protects this address, check its service token."
+
+/** What a request a proxy stopped for its basic-auth login fails with, on any gateway call. */
+const val PROXY_LOGIN_NEEDED =
+    "A proxy in front of Hermes asks for a username and password. Add them for this gateway, or check the saved ones."
 
 private val HttpResponse.isJson: Boolean get() = contentType()?.match(ContentType.Application.Json) == true
 
