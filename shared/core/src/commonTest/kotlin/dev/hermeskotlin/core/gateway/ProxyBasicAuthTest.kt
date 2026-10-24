@@ -65,6 +65,16 @@ class ProxyBasicAuthTest {
     }
 
     @Test
+    fun aRedirectIsNotFollowedSoTheLoginStaysWithItsHost() = runTest {
+        logins.set(url.host, login)
+        val http = client { respond("", HttpStatusCode.Found, headersOf(HttpHeaders.Location, "https://elsewhere.example.com/")) }
+
+        http.get(url.resolve("api/status"))
+
+        assertEquals(listOf(url.host), seen.map { it.url.host })
+    }
+
+    @Test
     fun theBrowserSignInsBearerDoesNotReplaceTheProxyLogin() = runTest {
         logins.set(url.host, login)
         val tokens = NativeTokens(store)
