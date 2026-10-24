@@ -262,7 +262,10 @@ internal fun ConnectView(
                 if (result is ProbeResult.ProxyLoginRequired || state.proxyError != null || proxy.saved) proxyOpen = true
             }
             HelpRow(Lucide.Lock, stringResource(Res.string.connect_behind_proxy), proxyOpen) { proxyOpen = !proxyOpen }
-            if (proxyOpen) ProxyLoginFields(proxy, state.proxyError, test)
+            if (proxyOpen) {
+                val rejected = result is ProbeResult.ProxyLoginRequired && result.loginSent
+                ProxyLoginFields(proxy, rejected, state.proxyError, test)
+            }
         }
 
         if (signInReady) {
@@ -435,37 +438,42 @@ private fun ClientCertFields(cert: ClientCert, demanded: Boolean, onPick: () -> 
     }
 }
 
-/** The username and password for a proxy with HTTP basic auth, sent with every request to this gateway's address. */
+/**
+ * The username and password for a proxy with HTTP basic auth, sent with every request to this gateway's address.
+ * Once saved, the fields give way to the saved login, until Reset forgets it.
+ */
 @Composable
-private fun ProxyLoginFields(proxy: ProxyLogin, error: String?, onTest: () -> Unit) {
+private fun ProxyLoginFields(proxy: ProxyLogin, rejected: Boolean, error: String?, onTest: () -> Unit) {
     Column(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Hint(stringResource(Res.string.connect_proxy_hint))
         if (proxy.saved) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                StatusDot(Status.Ok, stringResource(Res.string.connect_proxy_saved))
+                if (rejected) StatusDot(Status.Error, stringResource(Res.string.connect_proxy_rejected))
+                else StatusDot(Status.Ok, stringResource(Res.string.connect_proxy_saved))
                 Button(
-                    text = stringResource(Res.string.connect_forget),
+                    text = stringResource(Res.string.connect_reset),
                     onClick = proxy.onForget,
                     variant = ButtonVariant.Ghost,
                     size = ButtonSize.Small,
                 )
             }
-            Hint(stringResource(Res.string.connect_proxy_kept_hint))
+            Hint(stringResource(Res.string.connect_proxy_saved_hint))
+        } else {
+            Hint(stringResource(Res.string.connect_proxy_hint))
+            TextField(
+                state = proxy.username,
+                label = stringResource(Res.string.connect_proxy_username),
+                error = error,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
+            )
+            TextField(
+                state = proxy.password,
+                label = stringResource(Res.string.connect_proxy_password),
+                password = true,
+                supportingText = stringResource(if (isDesktop) Res.string.connect_proxy_password_supporting_desktop else Res.string.connect_proxy_password_supporting),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
+                onKeyboardAction = { onTest() },
+            )
         }
-        TextField(
-            state = proxy.username,
-            label = stringResource(Res.string.connect_proxy_username),
-            error = error,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
-        )
-        TextField(
-            state = proxy.password,
-            label = stringResource(Res.string.connect_proxy_password),
-            password = true,
-            supportingText = stringResource(if (isDesktop) Res.string.connect_proxy_password_supporting_desktop else Res.string.connect_proxy_password_supporting),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Go),
-            onKeyboardAction = { onTest() },
-        )
     }
 }
 

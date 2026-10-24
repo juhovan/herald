@@ -270,7 +270,9 @@
     <string name="connect_behind_proxy">Behind a proxy that asks for a password?</string>
     <string name="connect_proxy_hint">If a reverse proxy in front of Hermes (nginx, Caddy, Traefik…) asks for a username and password before the dashboard, enter that login here. It isn't the dashboard's own sign-in.</string>
     <string name="connect_proxy_saved">A proxy login is saved for this address</string>
-    <string name="connect_proxy_kept_hint">Leave the fields blank to keep using it, or enter a new login to replace it.</string>
+    <string name="connect_proxy_rejected">The proxy turned the saved login down</string>
+    <string name="connect_reset">Reset</string>
+    <string name="connect_proxy_saved_hint">It goes with every request to this address over https://. Reset it to enter another.</string>
     <string name="connect_proxy_username">Proxy username</string>
     <string name="connect_proxy_password">Proxy password</string>
     <string name="connect_proxy_password_supporting">Stored encrypted on this phone, and sent only to this address over https://.</string>
@@ -372,7 +374,7 @@
     <string name="check_fix_add_access_token">Add a Cloudflare Access service token for this gateway, and give the Access application a Service Auth policy that includes it.</string>
     <string name="check_proxy_login_required">A proxy in front of Hermes asks for a username and password (HTTP 401).</string>
     <string name="check_proxy_login_refused">The proxy in front of Hermes turned down the username and password (HTTP 401).</string>
-    <string name="check_fix_check_proxy_login">Check the proxy username and password saved for this gateway.</string>
+    <string name="check_fix_check_proxy_login">Reset the proxy login saved for this gateway, and enter the right username and password.</string>
     <string name="check_fix_add_proxy_login">Add the proxy's username and password for this gateway.</string>
     <string name="check_fix_proxy_https">Use the gateway's https:// address: the app sends a proxy password over https only.</string>
     <string name="check_fix_loopback">This address points at this phone, not the server. Use the server’s local network or Tailscale address instead.</string>
